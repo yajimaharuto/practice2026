@@ -8,9 +8,10 @@
             "name": "Launch",
             "type": "lldb",
             "request": "launch",
-            "program": "${fileDirname}\\build\\${fileBasenameNoExtension}.exe",
+            "program": "${workspaceFolder}\\build\\${fileBasenameNoExtension}.exe",
             "args": [],
-            "cwd": "${workspaceRoot}"
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
         }
     ]
 }

@@ -3,8 +3,8 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/**/include/opencv",
-                "C:/tools/msys64/clang64"
+                "${workspaceFolder}/**",
+                "C:/tools/msys64/clang64/include/opencv4"
             ],
             "defines": [
                 "_DEBUG",
