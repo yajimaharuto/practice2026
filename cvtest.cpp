@@ -76,8 +76,11 @@ int main(int argc, char* argv[]) {
   image = rgb2ycbcr(image);
   std::vector<cv::Mat> ycrcb;
   cv::split(image, ycrcb);  //[0] = y, [1] = Cr, [2] = Cb
-  cv::resize(ycrcb[1], ycrcb[1], cv::Size(), 0.5, 0.5);
-  cv::resize(ycrcb[2], ycrcb[2], cv::Size(), 0.5, 0.5);
+
+  int dh = 2, dv = 2;  // 4:2:0
+
+  cv::resize(ycrcb[1], ycrcb[1], cv::Size(), 1.0f / dh, 1.0f / dv);
+  cv::resize(ycrcb[2], ycrcb[2], cv::Size(), 1.0f / dh, 1.0f / dv);
 
   int QF;  // qを1~100に最大最小を決める必要がある
   int quality;
@@ -95,34 +98,45 @@ int main(int argc, char* argv[]) {
   if (QF == 0) QF = 1;
   float Scale = QF / 100.0f;
 
-  for (int c = 0; c < nc; ++c) {
-    const int width = ycrcb[c].cols;
-    const int height = ycrcb[c].rows;
-    for (int y = 0; y < height; y += 8) {
-      for (int x = 0; x < width; x += 8) {
-        // 起点の座標(x, y)で、8*8の領域を切り出す
-        cv::Mat tmp = ycrcb[0](cv::Rect(x, y, 8, 8));
-        cv::Mat blk;
-        tmp.convertTo(blk, CV_32F);
-        blk -= 128.0f;
-        // DCT
-        cv::dct(blk, blk, FWD);
-        // 量子化
-        quantize<FWD>(blk, qmatrix[c > 0], Scale);
-        // 逆量子化
-        quantize<INV>(blk, qmatrix[c > 0], Scale);
-        // Inverse DCT
-        cv::dct(blk, blk, INV);
-        blk += 128.0f;
-        blk.convertTo(tmp, CV_8U);
+  auto blkproc = [](cv::Mat& tmp, const float* qmatrix, float Scale) {
+    cv::Mat blk;
+    tmp.convertTo(blk, CV_32F);
+    blk -= 128.0f;
+    // DCT
+    cv::dct(blk, blk, FWD);
+    // 量子化
+    quantize<FWD>(blk, qmatrix, Scale);
+    // 逆量子化
+    quantize<INV>(blk, qmatrix, Scale);
+    // Inverse DCT
+    cv::dct(blk, blk, INV);
+    blk += 128.0f;
+    blk.convertTo(tmp, CV_8U);
 
-        // エントロピー符号化
+    // エントロピー符号化
+  };
+  // MCU の処理
+  const int width = ycrcb[0].cols;
+  const int height = ycrcb[0].rows;
+  for (int y = 0, cy = 0; y < height; y += 8 * dv, cy += 8) {
+    for (int x = 0, cx = 0; x < width; x += 8 * dh, cx += 8) {
+      for (int i = 0; i < dv; ++i) {
+        for (int j = 0; j < dh; ++j) {
+          // 起点の座標(x, y)で、8*8の領域を切り出す
+          cv::Mat tmpY = ycrcb[0](cv::Rect(x + j * 8, y + i * 8, 8, 8));
+          blkproc(tmpY, qmatrix[0], Scale);
+        }
+        // 起点の座標(x, y)で、8*8の領域を切り出す
+        cv::Mat tmpCr = ycrcb[1](cv::Rect(cx, cy, 8, 8));  // Cr
+        blkproc(tmpCr, qmatrix[1], Scale);
+        cv::Mat tmpCb = ycrcb[2](cv::Rect(cx, cy, 8, 8));  // Cb
+        blkproc(tmpCb, qmatrix[1], Scale);
       }
     }
   }
 
-  cv::resize(ycrcb[1], ycrcb[1], cv::Size(), 1 / 0.5, 1 / 0.5);
-  cv::resize(ycrcb[2], ycrcb[2], cv::Size(), 1 / 0.5, 1 / 0.5);
+  cv::resize(ycrcb[1], ycrcb[1], cv::Size(), dh, dv);
+  cv::resize(ycrcb[2], ycrcb[2], cv::Size(), dh, dv);
   cv::merge(ycrcb, image);
   cv::cvtColor(image, image, cv::COLOR_YCrCb2BGR);
   cv::imshow("loaded image", image);
