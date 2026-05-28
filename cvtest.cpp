@@ -44,8 +44,8 @@ cv::Mat rgb2ycbcr(cv::Mat img) {
 
   return img;
 }
-template <int x>
-void quantize(cv::Mat& blk, const float, *qtale, int quality = 75) {
+template <int X>
+void quantize(cv::Mat& blk, const float* qtable, float Scale) {
   const int width = blk.cols;
   const int height = blk.rows;
   const int nc = blk.channels();
@@ -54,9 +54,9 @@ void quantize(cv::Mat& blk, const float, *qtale, int quality = 75) {
   for (int i = 0; i < height; ++i) {
     for (int j = 0; j < width; ++j) {
       auto val = pixel[i * stride + j];
-      auto stepsize = clamp<float>(qtable[i * stride + j]);
+      auto stepsize = clamp<float>(qtable[i * stride + j] * Scale);
       // xは変数として扱われず、使用されない片方は実行時に消える
-      if (x == 0)  // 量子化
+      if (X == 0)  // 量子化
         pixel[i * stride + j] = roundf(val / stepsize);
       else  // 逆量子化
         pixel[i * stride + j] = val * stepsize;
@@ -64,10 +64,9 @@ void quantize(cv::Mat& blk, const float, *qtale, int quality = 75) {
   }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
   // cv::Mat image = cv::imread("./barbara.ppm", cv::IMREAD_ANYCOLOR);
-  cv::Mat image =
-      cv::imread("H:/practice2026/barbara.ppm", cv::IMREAD_ANYCOLOR);
+  cv::Mat image = cv::imread("./../barbara.ppm", cv::IMREAD_ANYCOLOR);
   // cv::Mat image(480, 640, CV_8UC3);
   if (image.empty()) return EXIT_FAILURE;
 
@@ -79,6 +78,23 @@ int main() {
   cv::split(image, ycrcb);  //[0] = y, [1] = Cr, [2] = Cb
   cv::resize(ycrcb[1], ycrcb[1], cv::Size(), 0.5, 0.5);
   cv::resize(ycrcb[2], ycrcb[2], cv::Size(), 0.5, 0.5);
+
+  int QF;  // qを1~100に最大最小を決める必要がある
+  int quality;
+  if (argc < 2) {
+    quality = 75;
+  } else {
+    quality = std::stoi(argv[1]);
+  }
+
+  if (quality <= 50)
+    QF = 5000 / quality;
+  else
+    QF = 200 - 2 * quality;
+
+  if (QF == 0) QF = 1;
+  float Scale = QF / 100.0f;
+
   for (int c = 0; c < nc; ++c) {
     const int width = ycrcb[c].cols;
     const int height = ycrcb[c].rows;
@@ -92,9 +108,9 @@ int main() {
         // DCT
         cv::dct(blk, blk, FWD);
         // 量子化
-        quantize<FWD>(blk, qmatrix[c > 0]);
+        quantize<FWD>(blk, qmatrix[c > 0], Scale);
         // 逆量子化
-        quantize<INV>(blk, qmatrix[c > 0]);
+        quantize<INV>(blk, qmatrix[c > 0], Scale);
         // Inverse DCT
         cv::dct(blk, blk, INV);
         blk += 128.0f;
