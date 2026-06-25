@@ -1,5 +1,5 @@
 // clang-format off
-
+#pragma once 
 constexpr int zigzag_scan[64] = {
     0,	1,	8,	16,	9,	2,	3,	10,
     17,	24,	32,	25,	18,	11,	4,	5,

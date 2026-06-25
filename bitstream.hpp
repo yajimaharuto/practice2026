@@ -50,6 +50,7 @@ class bitstream {
   }
   size_t finalize() {
     flush();
+
     return stream.size();
   }
 
