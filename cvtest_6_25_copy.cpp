@@ -10,8 +10,6 @@
 constexpr int Luma = 0;
 constexpr int Chroma = 1;
 
-// argv[1]:読み込む画像 argv[2]:出力 argv[3]:quality argv[4]:YCCTYPE
-
 int main(int argc, char* argv[]) {
   if (argc < 3) {
     printf("usage:cvtest.exe input output <quality> <444, 420, ...");
@@ -125,3 +123,7 @@ int main(int argc, char* argv[]) {
   cv::destroyAllWindows();
   return EXIT_SUCCESS;
 }
+// qualityとファイルサイズの
+
+// ビットレートは1画素当たりに何ビット使用しているかを表す値、
+// 先ほどのファイルサイズと原画像のサイズから求められる関係を表す何かを作る

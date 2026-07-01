@@ -50,7 +50,7 @@ class bitstream {
   }
   size_t finalize() {
     flush();
-
+    put_word(0xFFD9);
     return stream.size();
   }
 
