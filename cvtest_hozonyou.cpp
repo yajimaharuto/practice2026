@@ -1,3 +1,4 @@
+#include <chrono>
 #include <iostream>
 #include <opencv2/opencv.hpp>
 
@@ -6,7 +7,6 @@
 #include "jpgheaders.hpp"
 #include "qtable.hpp"
 #include "ycctype.hpp"
-
 constexpr int Luma = 0;
 constexpr int Chroma = 1;
 
@@ -18,8 +18,10 @@ int main(int argc, char* argv[]) {
   }
   // cv::Mat image = cv::imread("./barbara.ppm", cv::IMREAD_ANYCOLOR);
   cv::Mat image = cv::imread("./../barbara.ppm", cv::IMREAD_ANYCOLOR);
+
   // cv::Mat image(480, 640, CV_8UC3);
   if (image.empty()) return EXIT_FAILURE;
+  cv::Mat original = image.clone();  // PSNR算出のための原画像
   bitstream encbuf;
 
   const int nc = image.channels();
@@ -79,6 +81,12 @@ int main(int argc, char* argv[]) {
     if (QF != 1) {
       qtable[0][i] = static_cast<int>(clamp<float>(qmatrix[0][i] * Scale));
       qtable[1][i] = static_cast<int>(clamp<float>(qmatrix[1][i] * Scale));
+      if (qtable[0][i] == 0) {
+        qtable[0][i] = 1;
+      }
+      if (qtable[1][i]) {
+        qtable[1][i] = 1;
+      }
     } else {
       qtable[0][i] = qtable[1][i] = 1;
     }
@@ -106,7 +114,9 @@ int main(int argc, char* argv[]) {
   }
   size_t length = encbuf.finalize();
 
-  std::cout << "codestream size = " << length << std::endl;
+  // std::cout << "codestream size = " << length << ". ";
+  std::cout << "bitrate = "
+            << static_cast<double>(length) * 8.0 / (width * height) << " ";
   FILE* fp = fopen(argv[2], "wb");
   if (fp == nullptr) {
     printf("Can't open file");
@@ -119,9 +129,42 @@ int main(int argc, char* argv[]) {
   cv::resize(ycrcb[2], ycrcb[2], cv::Size(), dh, dV);
   cv::merge(ycrcb, image);
   cv::cvtColor(image, image, cv::COLOR_YCrCb2BGR);
+  double mse = 0.0;
+  for (int i = 0; i < height; ++i) {
+    for (int j = 0; j < width; ++j) {
+      for (int c = 0; c < nc; ++c) {
+        int v0 = original.data[i * original.step + j * nc];
+        int v1 = image.data[i * image.step + j * nc + c];
+        mse += (v0 - v1) * (v0 - v1);
+      }
+    }
+  }
+  mse /= (width * height * nc);
+  double psnr = 10 * log10(255 * 255 / mse);
+  std::cout << psnr << std::endl;
   cv::imshow("loaded image", image);
 
   cv::waitKey(0);
   cv::destroyAllWindows();
   return EXIT_SUCCESS;
 }
+
+// ファイルサイズからbit rate(bit/pixel)への変換
+// bpp(bit per pixel) = (filesize*8)/(width* height)
+
+// RD曲線  横軸にbitrate縦軸に画質(様々な指標がある)をとること
+// PSNR　
+
+// 課題1：横軸bpp、縦軸psnr[dB]のRD曲線をbarbara.ppm+a(後で追加する画像)それぞれについてグラフにする
+// 課題2：以下のJPEGエンコード処理の中でどの処理が最も処理時間を食っているかを調査
+// ビットレートによって変化
+
+// RGB-> YCbCr色空間変換
+// DCT
+// 量子化
+// エントロピー符号化
+
+// tic = chrono::hidhresoluton_clock::now();開始
+// toc = chrono::hidhresoluton_clock::now();終了
+// size_tduration = std::chrono
+// ::duration_cast<std::chrono::microsecond>(tic-toc).count();
